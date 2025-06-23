@@ -18,8 +18,8 @@ st.set_page_config(
 @st.cache_resource
 def load_resources():
     # Cargar imágenes
-    bg_image = Image.open("background_top.png")
-    icon = Image.open("fake_news_icon.png")
+    bg_image = Image.open("assets/background_top.png")
+    icon = Image.open("assets/fake_news_icon.png")
     
     # Cargar modelo (versión con S3)
     try:
@@ -108,7 +108,7 @@ if st.button("**Analyze** 🔍", type="primary"):
             "Category": ["Real", "Fake"],
             "Probability (%)": [proba[0], proba[1]]
         })
-        st.bar_chart(prob_df, x="Category", y="Probability (%)", color="#2E86C1")
+        st.bar_chart(prob_df, x="Category", y="Probability (%)")
 
         # WordCloud para noticias falsas
         if prediction == 1:
