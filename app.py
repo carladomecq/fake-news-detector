@@ -6,6 +6,7 @@ import os
 import boto3
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import re
 
 # --- Configuración de página ---
 st.set_page_config(
@@ -18,150 +19,186 @@ st.set_page_config(
 BUCKET_NAME = "myfakenewsdemoseast1"
 MODEL_KEY = "models/fake_news_model.pkl"
 VECTORIZER_KEY = "models/tfidf_vectorizer.pkl"
+REGION = "us-east-1"
+MAX_TEXT_LENGTH = 10000  # Límite de caracteres para el texto de entrada
+
+# --- Función para limpieza de texto ---
+def clean_text(text):
+    # Eliminar URLs, menciones y hashtags
+    text = re.sub(r'http\S+|@\w+|#\w+', '', text)
+    # Normalizar espacios
+    text = re.sub(r'\s+', ' ', text).strip()
+    # Limitar longitud del texto
+    return text[:MAX_TEXT_LENGTH]
+
+# --- Formulario para credenciales AWS ---
+def get_aws_credentials():
+    st.sidebar.header("AWS Configuration")
+    aws_access_key = st.sidebar.text_input("AWS Access Key ID", type="password")
+    aws_secret_key = st.sidebar.text_input("AWS Secret Access Key", type="password")
+    
+    if not (aws_access_key and aws_secret_key):
+        st.warning("Please enter your AWS credentials in the sidebar")
+        st.stop()
+    
+    return aws_access_key, aws_secret_key
 
 # --- Carga segura de recursos ---
 @st.cache_resource
-def load_resources():
+def load_resources(aws_access_key, aws_secret_key):
     try:
-        # 1. Cargar imágenes
+        # 1. Cargar imágenes locales
         bg_image = Image.open("assets/background_top.png")
         icon = Image.open("assets/fake_news_icon.png")
         
-        # 2. Configurar cliente S3 con manejo de errores
+        # 2. Configurar cliente S3
         s3 = boto3.client(
             's3',
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-            region_name='us-east-1'
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key,
+            region_name=REGION
         )
         
-        # 3. Descargar modelos con verificación
-        if not all(key in (MODEL_KEY, VECTORIZER_KEY) for key in [MODEL_KEY, VECTORIZER_KEY]):
-            raise ValueError("Claves S3 inválidas")
-            
-        s3.download_file(BUCKET_NAME, MODEL_KEY, '/tmp/model.pkl')
-        s3.download_file(BUCKET_NAME, VECTORIZER_KEY, '/tmp/vectorizer.pkl')
+        # 3. Descargar modelos
+        s3.download_file(BUCKET_NAME, MODEL_KEY, 'model.pkl')
+        s3.download_file(BUCKET_NAME, VECTORIZER_KEY, 'vectorizer.pkl')
         
-        # 4. Cargar modelos con verificación de existencia
-        if not all(os.path.exists(f) for f in ['/tmp/model.pkl', '/tmp/vectorizer.pkl']):
-            raise FileNotFoundError("Modelos no descargados correctamente")
-            
-        model = joblib.load('/tmp/model.pkl')
-        vectorizer = joblib.load('/tmp/vectorizer.pkl')
+        # 4. Cargar modelos
+        model = joblib.load('model.pkl')
+        vectorizer = joblib.load('vectorizer.pkl')
         
         return bg_image, icon, model, vectorizer
         
     except Exception as e:
         st.error(f"""
-        ## 🚨 Error crítico
-        **No se pudieron cargar los recursos:**  
-        🔍 {str(e)}  
-        📌 Verifica:  
-        - Credenciales AWS en Secrets  
-        - Archivos en el bucket S3  
-        - Nombres de archivos locales  
+        ## 🚨 Error loading resources
+        **Details:** {str(e)}
+        
+        🔍 **Please check:**
+        1. AWS credentials are correct
+        2. Files exist in S3 bucket:
+           - s3://{BUCKET_NAME}/{MODEL_KEY}
+           - s3://{BUCKET_NAME}/{VECTORIZER_KEY}
+        3. Your IAM user has S3 read permissions
         """)
         st.stop()
 
 # --- Interfaz principal ---
 def main():
-    try:
-        bg_image, icon, model, vectorizer = load_resources()
-        
-        # Header
-        st.image(bg_image, use_container_width=True)
-        st.divider()
-        
-        # Title
-        col1, col2 = st.columns([0.2, 0.8])
-        with col1:
-            st.image(icon, width=90)
-        with col2:
-            st.markdown(
-                '<span style="color: #DC143C; font-size: 2.5em; font-weight: bold;">Fake News Detector AI</span>',
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                '<span style="color: #5D6D7E; font-size: 1.2em;">Enter a news text, and our AI will analyze its authenticity.</span>',
-                unsafe_allow_html=True
-            )
-
-        # Sidebar
-        with st.sidebar:
-            st.header("About")
-            st.markdown("""
-            - **Model**: Logistic Regression (TF-IDF)
-            - **Accuracy**: ~95% (English texts)
-            - **Data Source**: Kaggle
-            - **Storage**: AWS S3
-            """)
-
-        # User input
-        user_input = st.text_area(
-            "**Paste news text here:**",
-            height=200,
-            placeholder="e.g., 'Scientists discover a new energy source...'"
+    # Obtener credenciales
+    aws_access_key, aws_secret_key = get_aws_credentials()
+    
+    # Cargar recursos
+    bg_image, icon, model, vectorizer = load_resources(aws_access_key, aws_secret_key)
+    
+    # Header
+    st.image(bg_image, use_container_width=True)
+    st.divider()
+    
+    # Title
+    col1, col2 = st.columns([0.2, 0.8])
+    with col1:
+        st.image(icon, width=90)
+    with col2:
+        st.markdown(
+            '<span style="color: #DC143C; font-size: 2.5em; font-weight: bold;">Fake News Detector AI</span>',
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f'<span style="color: #5D6D7E; font-size: 1.2em;">Enter a news text (max {MAX_TEXT_LENGTH:,} chars), and our AI will analyze its authenticity.</span>',
+            unsafe_allow_html=True
         )
 
-        # Analysis
-        if st.button("**Analyze** 🔍", type="primary"):
-            if not user_input.strip():
-                st.warning("Please enter news text to analyze")
-                return
+    # User input con límite de caracteres
+    user_input = st.text_area(
+        f"**Paste news text here (max {MAX_TEXT_LENGTH:,} characters):**",
+        height=200,
+        max_chars=MAX_TEXT_LENGTH,
+        placeholder="e.g., 'Scientists discover a new energy source...'"
+    )
+
+    # Mostrar contador de caracteres
+    if user_input:
+        chars_remaining = MAX_TEXT_LENGTH - len(user_input)
+        st.caption(f"Characters remaining: {chars_remaining:,}")
+
+    # Analysis
+    if st.button("**Analyze** 🔍", type="primary"):
+        if not user_input.strip():
+            st.warning("Please enter news text to analyze")
+            return
+            
+        # Limpiar y truncar el texto si es necesario
+        cleaned_text = clean_text(user_input)
+        if len(user_input) > MAX_TEXT_LENGTH:
+            st.warning(f"Text was truncated to {MAX_TEXT_LENGTH:,} characters for optimal analysis")
+            
+        try:
+            text_vec = vectorizer.transform([cleaned_text])
+            prediction = model.predict(text_vec)[0]
+            proba = model.predict_proba(text_vec)[0] * 100
+
+            # Results
+            st.divider()
+            result_col1, result_col2 = st.columns([0.7, 0.3])
+            
+            with result_col1:
+                if prediction == 0:
+                    st.success(f"### ✅ Real News\n**Confidence**: {proba[0]:.1f}%")
+                else:
+                    st.error(f"### ❌ Fake News\n**Confidence**: {proba[1]:.1f}%")
+
+            with result_col2:
+                prob_df = pd.DataFrame({
+                    "Category": ["Real", "Fake"],
+                    "Probability (%)": [proba[0], proba[1]]
+                })
+                st.bar_chart(prob_df.set_index("Category"))
+
+            # WordCloud para noticias falsas - VERSIÓN CORREGIDA
+            if prediction == 1:
+                st.subheader("Fake News Keywords", divider="gray")
                 
-            try:
-                text_vec = vectorizer.transform([user_input])
-                prediction = model.predict(text_vec)[0]
-                proba = model.predict_proba(text_vec)[0] * 100
-
-                # Results
-                st.divider()
-                result_col1, result_col2 = st.columns([0.7, 0.3])
+                # Obtener características y pesos
+                feature_names = vectorizer.get_feature_names_out()
+                feature_weights = model.coef_[0]
                 
-                with result_col1:
-                    if prediction == 0:
-                        st.success(f"### ✅ Real News\n**Confidence**: {proba[0]:.1f}%")
-                    else:
-                        st.error(f"### ❌ Fake News\n**Confidence**: {proba[1]:.1f}%")
-
-                with result_col2:
-                    prob_df = pd.DataFrame({
-                        "Category": ["Real", "Fake"],
-                        "Probability (%)": [proba[0], proba[1]]
-                    })
-                    st.bar_chart(prob_df.set_index("Category"))
-
-                # WordCloud for fake news
-                if prediction == 1:
-                    st.subheader("Fake News Keywords", divider="gray")
-                    features = vectorizer.get_feature_names_out()
-                    weights = model.coef_[0]
-                    word_freq = {word: abs(weight) for word, weight in zip(features, weights)}
-                    
-                    fig, ax = plt.subplots()
-                    WordCloud(
+                # Crear diccionario palabra:peso (filtrando palabras irrelevantes)
+                word_weights = {
+                    word: abs(weight) 
+                    for word, weight in zip(feature_names, feature_weights) 
+                    if weight < -0.5  # Solo palabras con fuerte correlación a fake news
+                }
+                
+                if word_weights:
+                    # Configurar WordCloud
+                    wc = WordCloud(
                         width=800,
                         height=400,
                         background_color='white',
                         colormap='Reds',
-                        max_words=50
-                    ).generate_from_frequencies(word_freq).to_image()
+                        max_words=50,
+                        collocations=False  # Evita palabras combinadas
+                    )
                     
+                    # Generar y mostrar
+                    wordcloud = wc.generate_from_frequencies(word_weights)
+                    fig, ax = plt.subplots()
+                    ax.imshow(wordcloud, interpolation='bilinear')
+                    ax.axis("off")
                     st.pyplot(fig)
-                    
-            except Exception as e:
-                st.error(f"Analysis error: {str(e)}")
+                else:
+                    st.info("No significant keywords found for this fake news prediction")
+                
+        except Exception as e:
+            st.error(f"Analysis error: {str(e)}")
 
-        # Footer
-        st.divider()
-        st.caption("""
-        <div style="text-align: center; color: #7F8C8D;">
-            Made with ❤️ using Streamlit | Model by <b>Carla Domecq</b> | © 2025
-        </div>""", unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error(f"Application error: {str(e)}")
-        st.stop()
+    # Footer
+    st.divider()
+    st.caption("""
+    <div style="text-align: center; color: #7F8C8D;">
+        Made with ❤️ using Streamlit | Model by <b>Carla Domecq</b> | © 2025
+    </div>""", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
