@@ -1,0 +1,88 @@
+# Secrets y credenciales
+.env
+.streamlit/secrets.toml
+*.pem
+*.key
+
+# Archivos de modelos (si los subes a S3)
+*.pkl
+*.joblib
+*.h5
+*.pt
+
+# Entornos virtuales
+venv/
+.env/
+venv*/
+*.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Streamlit
+data/
+tmp/
+
+# AWS configuración local
+.aws/credentials
+
+# Secrets y credenciales
+.env
+.streamlit/secrets.toml
+*.pem
+*.key
+
+# Archivos de modelos (si los subes a S3)
+*.pkl
+*.joblib
+*.h5
+*.pt
+
+# Entornos virtuales
+venv/
+.env/
+venv*/
+*.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Editor/IDE
+#.vscode/
+#.idea/
+#*.swp
+#*.swo
+
+# Sistema
+#.DS_Store
+#Thumbs.db
+
+# Streamlit
+#data/
+#tmp/
+
+# AWS configuración local
+.aws/credentials
+secrets.toml
+streamlit/
+# Archivos grandes (opcional)
+#*.csv
+#*.json
+#*.zip
+#*.gz
