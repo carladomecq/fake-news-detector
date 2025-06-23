@@ -19,7 +19,6 @@ st.set_page_config(
 BUCKET_NAME = "myfakenewsdemoseast1"
 MODEL_KEY = "models/fake_news_model.pkl"
 VECTORIZER_KEY = "models/tfidf_vectorizer.pkl"
-REGION = "us-east-1"
 MAX_TEXT_LENGTH = 10000  # Límite de caracteres para el texto de entrada
 
 # --- Función para limpieza de texto ---
@@ -31,45 +30,20 @@ def clean_text(text):
     # Limitar longitud del texto
     return text[:MAX_TEXT_LENGTH]
 
-# --- Obtener credenciales AWS de variables de entorno ---
-def get_aws_credentials():
-    try:
-        # Intenta obtener las credenciales de los secrets de Streamlit
-        aws_access_key = st.secrets["AWS_ACCESS_KEY_ID"]
-        aws_secret_key = st.secrets["AWS_SECRET_ACCESS_KEY"]
-        
-        return aws_access_key, aws_secret_key
-        
-    except Exception as e:
-        st.error(f"""
-        ## 🚨 Error loading AWS credentials
-        **Details:** {str(e)}
-        
-        🔍 **Please check:**
-        1. AWS credentials are properly set in Streamlit secrets
-        2. Required secrets are:
-           - AWS_ACCESS_KEY_ID
-           - AWS_SECRET_ACCESS_KEY
-        """)
-        st.stop()
-
 # --- Carga segura de recursos ---
 @st.cache_resource
 def load_resources():
     try:
-        # Obtener credenciales
-        aws_access_key, aws_secret_key = get_aws_credentials()
-        
         # 1. Cargar imágenes locales
         bg_image = Image.open("assets/background_top.png")
         icon = Image.open("assets/fake_news_icon.png")
         
-        # 2. Configurar cliente S3
+        # 2. Configurar cliente S3 con credenciales de secrets
         s3 = boto3.client(
             's3',
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_key,
-            region_name=REGION
+            aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+            aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
+            region_name=st.secrets["AWS_DEFAULT_REGION"]
         )
         
         # 3. Descargar modelos
@@ -88,7 +62,7 @@ def load_resources():
         **Details:** {str(e)}
         
         🔍 **Please check:**
-        1. AWS credentials are correct
+        1. AWS credentials in Streamlit secrets are correct
         2. Files exist in S3 bucket:
            - s3://{BUCKET_NAME}/{MODEL_KEY}
            - s3://{BUCKET_NAME}/{VECTORIZER_KEY}
@@ -99,7 +73,7 @@ def load_resources():
 
 # --- Interfaz principal ---
 def main():
-    # Cargar recursos (las credenciales se obtienen internamente)
+    # Cargar recursos (las credenciales se obtienen de los secrets)
     bg_image, icon, model, vectorizer = load_resources()
     
     # Header
@@ -174,25 +148,22 @@ def main():
                 feature_names = vectorizer.get_feature_names_out()
                 feature_weights = model.coef_[0]
                 
-                # Crear diccionario palabra:peso (filtrando palabras irrelevantes)
+                # Crear diccionario palabra:peso
                 word_weights = {
                     word: abs(weight) 
                     for word, weight in zip(feature_names, feature_weights) 
-                    if weight < -0.5  # Solo palabras con fuerte correlación a fake news
+                    if weight < -0.5  # Palabras con fuerte correlación a fake news
                 }
                 
                 if word_weights:
-                    # Configurar WordCloud
                     wc = WordCloud(
                         width=800,
                         height=400,
                         background_color='white',
                         colormap='Reds',
                         max_words=50,
-                        collocations=False  # Evita palabras combinadas
+                        collocations=False
                     )
-                    
-                    # Generar y mostrar
                     wordcloud = wc.generate_from_frequencies(word_weights)
                     fig, ax = plt.subplots()
                     ax.imshow(wordcloud, interpolation='bilinear')
