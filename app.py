@@ -31,22 +31,35 @@ def clean_text(text):
     # Limitar longitud del texto
     return text[:MAX_TEXT_LENGTH]
 
-# --- Formulario para credenciales AWS ---
+# --- Obtener credenciales AWS de variables de entorno ---
 def get_aws_credentials():
-    st.sidebar.header("AWS Configuration")
-    aws_access_key = st.sidebar.text_input("AWS Access Key ID", type="password")
-    aws_secret_key = st.sidebar.text_input("AWS Secret Access Key", type="password")
-    
-    if not (aws_access_key and aws_secret_key):
-        st.warning("Please enter your AWS credentials in the sidebar")
+    try:
+        # Intenta obtener las credenciales de los secrets de Streamlit
+        aws_access_key = st.secrets["AWS_ACCESS_KEY_ID"]
+        aws_secret_key = st.secrets["AWS_SECRET_ACCESS_KEY"]
+        
+        return aws_access_key, aws_secret_key
+        
+    except Exception as e:
+        st.error(f"""
+        ## 🚨 Error loading AWS credentials
+        **Details:** {str(e)}
+        
+        🔍 **Please check:**
+        1. AWS credentials are properly set in Streamlit secrets
+        2. Required secrets are:
+           - AWS_ACCESS_KEY_ID
+           - AWS_SECRET_ACCESS_KEY
+        """)
         st.stop()
-    
-    return aws_access_key, aws_secret_key
 
 # --- Carga segura de recursos ---
 @st.cache_resource
-def load_resources(aws_access_key, aws_secret_key):
+def load_resources():
     try:
+        # Obtener credenciales
+        aws_access_key, aws_secret_key = get_aws_credentials()
+        
         # 1. Cargar imágenes locales
         bg_image = Image.open("assets/background_top.png")
         icon = Image.open("assets/fake_news_icon.png")
@@ -80,16 +93,14 @@ def load_resources(aws_access_key, aws_secret_key):
            - s3://{BUCKET_NAME}/{MODEL_KEY}
            - s3://{BUCKET_NAME}/{VECTORIZER_KEY}
         3. Your IAM user has S3 read permissions
+        4. Network connectivity to AWS
         """)
         st.stop()
 
 # --- Interfaz principal ---
 def main():
-    # Obtener credenciales
-    aws_access_key, aws_secret_key = get_aws_credentials()
-    
-    # Cargar recursos
-    bg_image, icon, model, vectorizer = load_resources(aws_access_key, aws_secret_key)
+    # Cargar recursos (las credenciales se obtienen internamente)
+    bg_image, icon, model, vectorizer = load_resources()
     
     # Header
     st.image(bg_image, use_container_width=True)
@@ -155,7 +166,7 @@ def main():
                 })
                 st.bar_chart(prob_df.set_index("Category"))
 
-            # WordCloud para noticias falsas - Versión mejorada
+            # WordCloud para noticias falsas
             if prediction == 1:
                 st.subheader("Fake News Keywords", divider="gray")
                 
