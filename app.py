@@ -19,7 +19,7 @@ st.set_page_config(
 BUCKET_NAME = "myfakenewsdemoseast1"
 MODEL_KEY = "models/fake_news_model.pkl"
 VECTORIZER_KEY = "models/tfidf_vectorizer.pkl"
-MAX_TEXT_LENGTH = 10000  # Límite de caracteres para el texto de entrada
+MAX_TEXT_LENGTH = 4000  # Límite de caracteres para el texto de entrada
 
 # --- Función para limpieza de texto ---
 def clean_text(text):
@@ -84,13 +84,14 @@ def main():
     col1, col2 = st.columns([0.2, 0.8])
     with col1:
         st.image(icon, width=90)
+        # Texto movido aquí debajo de la imagen
+        st.markdown(
+            f'<div style="margin-top: 10px;"><span style="color: #5D6D7E; font-size: 1.2em;">Enter a news text (max {MAX_TEXT_LENGTH:,} chars), and our AI will analyze its authenticity.</span></div>',
+            unsafe_allow_html=True
+        )
     with col2:
         st.markdown(
             '<span style="color: #DC143C; font-size: 2.5em; font-weight: bold;">Fake News Detector AI</span>',
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            f'<div style="text-align: left;"><span style="color: #5D6D7E; font-size: 1.2em;">Enter a news text (max {MAX_TEXT_LENGTH:,} chars), and our AI will analyze its authenticity.</span></div>',
             unsafe_allow_html=True
         )
 
