@@ -155,7 +155,7 @@ def main():
                 })
                 st.bar_chart(prob_df.set_index("Category"))
 
-            # WordCloud para noticias falsas - VERSIÓN CORREGIDA
+            # WordCloud para noticias falsas - Versión mejorada
             if prediction == 1:
                 st.subheader("Fake News Keywords", divider="gray")
                 
