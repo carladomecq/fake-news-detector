@@ -90,7 +90,7 @@ def main():
             unsafe_allow_html=True
         )
         st.markdown(
-            f'<span style="color: #5D6D7E; font-size: 1.2em;">Enter a news text (max {MAX_TEXT_LENGTH:,} chars), and our AI will analyze its authenticity.</span>',
+            f'<div style="text-align: left;"><span style="color: #5D6D7E; font-size: 1.2em;">Enter a news text (max {MAX_TEXT_LENGTH:,} chars), and our AI will analyze its authenticity.</span></div>',
             unsafe_allow_html=True
         )
 
